@@ -43,7 +43,7 @@ struct NDIContext {
     AVStream *video_st, *audio_st;
 };
 
-static int ndi_set_video_packet(AVFormatContext *avctx, NDIlib_video_frame_t *v, AVPacket *pkt)
+static int ndi_set_video_packet(AVFormatContext *avctx, NDIlib_video_frame_v2_t *v, AVPacket *pkt)
 {
     int ret;
     struct NDIContext *ctx = avctx->priv_data;
@@ -52,11 +52,11 @@ static int ndi_set_video_packet(AVFormatContext *avctx, NDIlib_video_frame_t *v,
     if (ret < 0)
         return ret;
 
-    pkt->dts = pkt->pts = av_rescale_q(v->timecode, NDI_TIME_BASE_Q, ctx->video_st->time_base);
+    pkt->dts = pkt->pts = av_rescale_q(v->timestamp, NDI_TIME_BASE_Q, ctx->video_st->time_base);
     pkt->duration = av_rescale_q(1, (AVRational){v->frame_rate_D, v->frame_rate_N}, ctx->video_st->time_base);
 
-    av_log(avctx, AV_LOG_DEBUG, "%s: pkt->dts = pkt->pts = %"PRId64", duration=%"PRId64", timecode=%"PRId64"\n",
-            __func__, pkt->dts, pkt->duration, v->timecode);
+    av_log(avctx, AV_LOG_DEBUG, "%s: pkt->dts = pkt->pts = %"PRId64", duration=%"PRId64", timecode=%"PRId64" timestamp=%"PRId64"\n",
+            __func__, pkt->dts, pkt->duration, v->timecode, v->timestamp);
 
     pkt->flags         |= AV_PKT_FLAG_KEY;
     pkt->stream_index   = ctx->video_st->index;
@@ -177,7 +177,7 @@ static int ndi_read_header(AVFormatContext *avctx)
     return 0;
 }
 
-static int ndi_create_video_stream(AVFormatContext *avctx, NDIlib_video_frame_t *v)
+static int ndi_create_video_stream(AVFormatContext *avctx, NDIlib_video_frame_v2_t *v)
 {
     AVStream *st;
     AVRational tmp;
@@ -262,14 +262,14 @@ static int ndi_read_packet(AVFormatContext *avctx, AVPacket *pkt)
     struct NDIContext *ctx = avctx->priv_data;
 
     while (!ret) {
-        NDIlib_video_frame_t v;
+        NDIlib_video_frame_v2_t v;
         NDIlib_audio_frame_t a;
         NDIlib_metadata_frame_t m;
         NDIlib_frame_type_e t;
 
-        av_log(avctx, AV_LOG_DEBUG, "NDIlib_recv_capture...\n");
-        t = NDIlib_recv_capture(ctx->recv, &v, &a, &m, 40);
-        av_log(avctx, AV_LOG_DEBUG, "NDIlib_recv_capture=%d\n", t);
+        // av_log(avctx, AV_LOG_DEBUG, "NDIlib_recv_capture...\n");
+        t = NDIlib_recv_capture_v2(ctx->recv, &v, &a, &m, 40);
+        //av_log(avctx, AV_LOG_DEBUG, "NDIlib_recv_capture=%d\n", t);
 
         if (t == NDIlib_frame_type_video) {
             if (!ctx->video_st)
